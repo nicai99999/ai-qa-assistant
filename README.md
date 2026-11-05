@@ -140,11 +140,12 @@ Python 3.12 · LangChain · Chroma · DeepSeek API · uv
 | `day27_健壮性.md` | 异常与日志 | 5 类异常零崩溃 |
 
 ## 快速开始
+> 仓库内的 PDF 未上传（体积原因），可自行把文档放进 `data/` 后执行上面的建索引命令。
 
 ```bash
-git clone <仓库地址>
+git clone https://github.com/nicai99999/ai-qa-assistant.git
 cd ai-qa-assistant
 uv sync
 cp .env.example .env    # 填入 DEEPSEEK_API_KEY 和 embedding 服务的 key
-uv run python src/reindex.py              # 建索引
+uv run python src/reindex.py              # 建索引（需先把 pdf/txt/md 放进 data/）
 uv run python -m ai_qa_assistant          # 开始对话
