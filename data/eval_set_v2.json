@@ -1,0 +1,82 @@
+[
+  {
+    "question": "如何防止恶意用户在提示词中夹带特殊指令，从而破坏系统预设的安全边界？",
+    "expected_keywords": ["输入过滤", "权限隔离", "人工确认"],
+    "answerable": true
+  },
+  {
+    "question": "在构建大模型应用时，负责将输入变量动态替换进固定文本结构的组件叫什么？",
+    "expected_keywords": ["PromptTemplate", "模板化"],
+    "answerable": true
+  },
+  {
+    "question": "当文本切分块之间的重合度设置得较大（如 500）时，会带来什么负面效果？",
+    "expected_keywords": ["混入无关内容", "上下文完整"],
+    "answerable": true
+  },
+  {
+    "question": "检索时如果发现找出来的内容不够准确，可以通过哪些技术手段进行优化提升？",
+    "expected_keywords": ["相似度阈值", "Rerank 重排", "混合检索"],
+    "answerable": true
+  },
+  {
+    "question": "在 LangGraph 框架中，专门用来保存和恢复历史对话状态的组件是什么？",
+    "expected_keywords": ["Memory", "Checkpointer"],
+    "answerable": true
+  },
+  {
+    "question": "将高频操作提取为独立可调用的技能包，在软件开发中有哪些商业价值？",
+    "expected_keywords": ["可复用技能模块", "开发快", "复用性强"],
+    "answerable": true
+  },
+  {
+    "question": "在做项目复盘介绍量化指标提升时，数据来源有什么硬性要求？",
+    "expected_keywords": ["命中率", "自己测"],
+    "answerable": true
+  },
+  {
+    "question": "大模型在决定执行外部函数前，主要依靠什么信息来判断该选哪个函数？",
+    "expected_keywords": ["名称", "描述", "推理"],
+    "answerable": true
+  },
+  {
+    "question": "当对话历史过长超出上下文限制时，可以通过什么机制优先淘汰不重要的信息？",
+    "expected_keywords": ["重要性标签", "淘汰低分"],
+    "answerable": true
+  },
+  {
+    "question": "如果代码中接口地址配置有误，通常会导致什么类型的网络报错？",
+    "expected_keywords": ["base_url", "404"],
+    "answerable": true
+  },
+  {
+    "question": "在控制对话上下文长度时，除了只保留最近几句外，还能用什么低成本策略保留历史脉络？",
+    "expected_keywords": ["摘要压缩", "总结成摘要"],
+    "answerable": true
+  },
+  {
+    "question": "LangChain 的创始人是谁？",
+    "expected_keywords": [],
+    "answerable": false
+  },
+  {
+    "question": "苹果公司 2023 年的总营收是多少？",
+    "expected_keywords": [],
+    "answerable": false
+  },
+  {
+    "question": "今天太原市的天气怎么样？",
+    "expected_keywords": [],
+    "answerable": false
+  },
+  {
+    "question": "Python 3.12 版本是哪一年发布的？",
+    "expected_keywords": [],
+    "answerable": false
+  },
+  {
+    "question": "请给我写一首关于春天的七言绝句。",
+    "expected_keywords": [],
+    "answerable": false
+  }
+]
