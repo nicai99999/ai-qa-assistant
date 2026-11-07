@@ -171,14 +171,10 @@ with st.sidebar:
     # 作用域范围	单会话级。每个 session_id 拥有自己独立的一组聊天记录。	全局级。不管你开多少个会话，所有的 Token 和耗时都在累加。
 
     # 使用 columns 将统计指标横向排布，节省空间
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Tokens", stats["tokens"] or "—")
-    with col2:
-        avg = stats["elapsed_ms"] / stats["turns"] if stats["turns"] else 0.0
-        st.metric("平均耗时", f"{avg:.0f} ms")
-    with col3:
-        st.metric("对话轮数", stats["turns"])
+    st.metric("Tokens", stats["tokens"] or "—")
+    avg = stats["elapsed_ms"] / stats["turns"] if stats["turns"] else 0.0
+    st.metric("平均耗时", f"{avg:.0f} ms")
+    st.metric("对话轮数", stats["turns"])
     # st.metric 用于渲染显眼的数据指标卡片
 
 
