@@ -1,4 +1,4 @@
-"""流式问答：一个字一个字地吐出来。
+"""流式问答（完整链路：改写 → 检索 → 记忆 → 生成）。
 
 和阻塞版的区别：
     阻塞版：llm.invoke() → 等全部生成完 → 一次性返回
@@ -20,11 +20,18 @@ from collections.abc import Iterator
 from src.retriever import TOP_K, retrieve
 from llm import get_llm
 from logging_setup import log_llm_call
+from query_rewrite import rewrite_query
+from rag_memory import build_memory_block
 from rag_qa import NO_ANSWER, build_citations, build_context
 
 logger = logging.getLogger(__name__)
 
+MAX_QUESTION_LEN = 2000
+
 STREAM_PROMPT = """你是一个严谨的问答助手。
+
+对话记忆：
+{memory}
 
 资料：
 {context}
@@ -35,6 +42,8 @@ STREAM_PROMPT = """你是一个严谨的问答助手。
 1. 只使用资料中的信息回答，不要编造。
 2. 每个结论后面用 [1]、[2] 标注依据来自第几段资料。
 3. 如果资料中没有相关信息，只回答：资料中未提及
+4. 如果问题是在询问用户自己说过的信息，直接根据"对话记忆"回答，
+   并在末尾标注（来自对话记忆）。
 
 回答："""
 
@@ -44,33 +53,45 @@ def stream_answer(
     session_id: str,
     store_obj,
     collector: dict,
-        # 普通函数可以用 return 把耗时、引用等信息打包返回。但生成器只能 yield 字符串，无法 return 复杂数据。
-        # 所以这里传入一个外部的空字典（引用传递），把需要额外传递的数据塞进去，调用方在外面就能读到了
     k: int = TOP_K,
+    where: dict | None = None,
+    use_rewrite: bool = True,
 ) -> Iterator[str]:
     """生成器：边生成边 yield 文本片段。
 
     Args:
-        collector: 一个空字典，用于把检索结果/耗时带出去给调用方
-                   （生成器没法 return 值，只能靠外部容器传出来）。
+        collector: 普通函数能用 return 打包返回，生成器不行。
+                   所以传一个外部字典（引用传递），把耗时/引用/token 塞进去，
+                   调用方在外面读。
+        where: 可选的检索过滤条件，如 {"source": "xxx.pdf"}。
+               不传 = 在整个知识库检索（默认）。
+        use_rewrite: 是否用历史改写问题。关掉可做 A/B 对比。
     """
     question = (question or "").strip()
+
+    # 空问题要立刻结束。少了 return 就会继续往下走，拿空串去检索
     if not question:
         yield "问题不能为空。"
-        # 不像 return 立刻摧毁整个函数，而是把这个字符串“抛”给调用它的地方（比如 Web 界面或终端）。
-        # 抛出去之后，函数暂停。等前端接收完毕，调用者再次请求数据时，代码执行到下一行的 return。
         return
+
+    if len(question) > MAX_QUESTION_LEN:
+        yield f"问题过长（{len(question)} 字），请控制在 {MAX_QUESTION_LEN} 字以内。"
+        return
+
+    # ---------- 阶段 0：用历史改写问题 ----------
+    # 代词句（"它有哪些步骤"）没有实词，直接检索会退化。
+    # 先用对话历史把它补成完整问句，再拿去检索。
+    turns = store_obj.history(session_id)
+    rewritten = rewrite_query(question, turns) if use_rewrite else question
+    collector["rewritten"] = rewritten
+    collector["where"] = where
 
     # ---------- 阶段 1：检索（同步阻塞） ----------
     t0 = time.perf_counter()
-    hits = retrieve(question, k=k)
+    hits = retrieve(rewritten, k=k, where=where)
     retrieve_ms = (time.perf_counter() - t0) * 1000
-    # elapsed_ms = (time.perf_counter() - start) * 1000
-    # 如果 retrieve_ms 只有 50ms（说明数据库查得极快），而生成花了 4950ms，那瓶颈在大模型生成太慢。你需要换用更快的模型（比如 deepseek-flash），或者开启流式输出。
-    # 如果 retrieve_ms 高达 2000ms，说明你的向量数据库卡了。可能是网络慢、数据量太大没有建好索引，或者你调用的云端 Embedding 接口（阿里云）响应太慢。
     collector["retrieve_ms"] = retrieve_ms
     collector["hits"] = hits
-    # 把检索耗时和检索结果塞进 collector 字典里
 
     if not hits:
         store_obj.append(session_id, question, NO_ANSWER)
@@ -80,9 +101,15 @@ def stream_answer(
     context = build_context(hits)
     collector["citations"] = build_citations(hits)
 
-    prompt = STREAM_PROMPT.format(context=context, question=question)
+    # ---------- 阶段 2：拼记忆块 ----------
+    # 没有这一步，多轮对话就是假的——模型看不到历史。
+    memory = build_memory_block(store_obj, session_id)
 
-    # ---------- 阶段 2：流式生成 ----------
+    prompt = STREAM_PROMPT.format(
+        memory=memory, context=context, question=question
+    )
+
+    # ---------- 阶段 3：流式生成 ----------
     llm = get_llm()
     pieces: list[str] = []
 
@@ -100,9 +127,9 @@ def stream_answer(
             # 记录首字延迟（TTFT）
 
         pieces.append(str(text))
-        # 把字收进列表（为了最后存历史）
+        # 收进列表，为了最后存历史
         yield str(text)
-        # 把字吐给调用方（前端）。前端拿到一个字符，立刻渲染一个字符，这就形成了打字机效果。
+        # 吐给调用方。前端拿到一个片段就渲染一个，形成打字机效果。
 
     end = time.perf_counter()
     total_ms = (end - start) * 1000
@@ -110,17 +137,12 @@ def stream_answer(
 
     answer = "".join(pieces).strip()
 
-    collector["total_tokens"] = 0
-    # 如果 stream 的 chunk 带 usage，可以累加；多数情况下拿不到，
-    # 这里退化为按字符数粗估：
+    # 流式接口通常拿不到精确 usage，按字符数粗估；界面要标"估算"
     collector["total_tokens"] = len(context) // 2 + len(answer) // 2
 
     store_obj.append(session_id, question, answer)
 
     logger.info(
-        "流式完成 检索=%.0fms 首字=%.0fms 生成=%.0fms 答长=%d",
-        retrieve_ms,
-        first_token_ms or 0.0,
-        total_ms,
-        len(answer),
+        "流式完成 改写=%r 检索=%.0fms 首字=%.0fms 生成=%.0fms 答长=%d",
+        rewritten, retrieve_ms, first_token_ms or 0.0, total_ms, len(answer),
     )

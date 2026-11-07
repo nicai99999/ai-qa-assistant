@@ -5,8 +5,8 @@ import logging
 from pathlib import Path
 
 # 修正了导入路径，使用标准的包名
-from ai_qa_assistant.retriever import retrieve
-from ai_qa_assistant.logging_setup import setup_logging
+from src.retriever import retrieve
+from logging_setup import setup_logging
 
 logger = logging.getLogger(__name__)
 
