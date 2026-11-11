@@ -1,0 +1,11 @@
+{
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "basic",
+  "executionEnvironments": [
+    {
+      "root": ".",
+      "extraPaths": ["src", "."]
+    }
+  ],
+  "exclude": [".venv", ".git", "chroma_db", "data", "docs", "**/__pycache__"]
+}
