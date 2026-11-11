@@ -1,4 +1,4 @@
-"""流式问答（完整链路：改写 → 检索 → 记忆 → 生成）。
+"""流式问答（完整链路：改写 → 检索 → 证据校验 → 记忆 → 生成）。
 
 和阻塞版的区别：
     阻塞版：llm.invoke() → 等全部生成完 → 一次性返回
@@ -18,6 +18,7 @@ from collections.abc import Iterator
 # 用于类型注解。明确告诉 IDE 和开发者，这个函数返回的是一个迭代器（生成器）
 
 from src.retriever import TOP_K, retrieve
+from evidence_check import check_evidence
 from llm import get_llm
 from logging_setup import log_llm_call
 from query_rewrite import rewrite_query
@@ -27,6 +28,14 @@ from rag_qa import NO_ANSWER, build_citations, build_context
 logger = logging.getLogger(__name__)
 
 MAX_QUESTION_LEN = 2000
+
+# 证据校验策略：score | coverage | judge | staged
+# 默认用 "score"：2026-11-09 实测（16 题评测集）中，
+#   score 策略（阈值 0.40）达到 识别率 80% / 保留率 100% / 调和 0.89
+#   staged 策略反而误拒 4 道可答题（保留率只有 64%）
+#   原因：重叠区可答题的关键词覆盖率普遍偏低，被 MIN_COVERAGE 拦掉
+# 如果以后语料变化导致 score 不够用，可以改回 "staged" 或 "judge" 重新对比。
+EVIDENCE_STRATEGY = "score"
 
 STREAM_PROMPT = """你是一个严谨的问答助手。
 
@@ -56,6 +65,7 @@ def stream_answer(
     k: int = TOP_K,
     where: dict | None = None,
     use_rewrite: bool = True,
+    evidence_strategy: str = EVIDENCE_STRATEGY,
 ) -> Iterator[str]:
     """生成器：边生成边 yield 文本片段。
 
@@ -66,6 +76,7 @@ def stream_answer(
         where: 可选的检索过滤条件，如 {"source": "xxx.pdf"}。
                不传 = 在整个知识库检索（默认）。
         use_rewrite: 是否用历史改写问题。关掉可做 A/B 对比。
+        evidence_strategy: 证据校验策略，见 evidence_check.check_evidence。
     """
     question = (question or "").strip()
 
@@ -98,6 +109,19 @@ def stream_answer(
         yield NO_ANSWER
         return
 
+    # ---------- 阶段 1.5：证据校验 ----------
+    # 检索总会返回 Top-K，哪怕库里没有相关内容。
+    # 这里判断"资料是否真的能回答问题"，不能就拒答，避免硬编。
+    llm = get_llm()
+    verdict = check_evidence(question, hits, strategy=evidence_strategy, llm=llm)
+    collector["evidence"] = verdict.as_dict()
+
+    if not verdict.ok:
+        message = f"{NO_ANSWER}（{verdict.reason}）"
+        store_obj.append(session_id, question, message)
+        yield message
+        return
+
     context = build_context(hits)
     collector["citations"] = build_citations(hits)
 
@@ -110,7 +134,6 @@ def stream_answer(
     )
 
     # ---------- 阶段 3：流式生成 ----------
-    llm = get_llm()
     pieces: list[str] = []
 
     start = time.perf_counter()
