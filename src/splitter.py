@@ -30,7 +30,7 @@ def summarize(chunks: list, chunk_size: int, chunk_overlap: int) -> dict:
     }
 def split_text(path, chunk_size, chunk_overlap) :
     # TODO(你写)：用 load_document 读出 docs，取 doc = docs[0]
-    docs = load_document(r"D:\ai-qa-assistant\data\06_面试纲要汇总.txt")
+    docs = load_document(path)
     # docs是一个集合[对象(page_content=text , metadata = {})]
     doc = docs[0] # 取出第一个对象
     # Document(page_content=text, metadata={"source": Path(path).name})
@@ -93,26 +93,3 @@ def split_text(path, chunk_size, chunk_overlap) :
 
     # chunks最终还是一个对象列表
     return chunks
-chunks = split_text(CHUNK_SIZE,
-CHUNK_OVERLAP ,
-END_MARKS  )
-# split_documents() 会把原文档的 metadata 深拷贝一份给每个块。 所以"这个块来自哪个文件"的信息天然保留下来了
-
-# TODO(你写)：打印 len(chunks)
-print(f"\n=== 参数: chunk_size={CHUNK_SIZE}, overlap={CHUNK_OVERLAP} ===")
-print(f"总计切出：{len(chunks)} 块\n")
-
-# 参考实现：打印部分
-for i, chunk in enumerate(chunks):
-    ratio = len(chunk.page_content) / CHUNK_SIZE * 100
-    print(f"[块 {i:02d}] 长度={len(chunk.page_content)}  ({ratio:.0f}% of {CHUNK_SIZE})来源={chunk.metadata.get('source')}")
-    # 02d
-    # d：代表 Decimal（十进制整数）。告诉 Python，我要格式化的是一个整数。
-    # 2：代表最小宽度为 2。
-    # 0：代表如果数字不够 2 位，用 0 在左边补齐（默认是用空格补齐）。
-    print(f"  开头：{chunk.page_content[:50]}……")
-    print("-" * 60)
-
-# 注意：summarize 要放到循环外面，否则每打印一个块就会把整份文档的统计重复打一遍
-print("\n=== 统计汇总 ===")
-print(summarize(chunks, CHUNK_SIZE, CHUNK_OVERLAP))
