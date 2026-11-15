@@ -15,7 +15,7 @@ import chromadb
 from splitter import split_text
 
 # ============ 配置区（改这里，不要改下面） ============
-PROJECT_ROOT = Path(r"D:\ai-qa-assistant")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CHROMA_DIR = str(PROJECT_ROOT / "chroma_db")
 # CHROMA_DIR：向量库文件将来会保存在本地硬盘的 chroma_db/ 文件夹里（持久化）。
 # 把“项目根目录”和“chroma_db 文件夹名”拼接在一起，转换成完整的绝对路径字符串。

@@ -30,7 +30,7 @@ def _chroma_client() -> chromadb.ClientAPI:
 logger = logging.getLogger(__name__)
 
 # ===== 0. 配置（这些常量必须和入库时完全一致）=====
-PROJECT_ROOT = Path(r"D:\ai-qa-assistant")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = str(PROJECT_ROOT / "chroma_db")
 
 # 极其重要：COLLECTION_NAME 和 EMBEDDING_MODEL 必须与 Day 17 完全一样！

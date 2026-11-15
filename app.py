@@ -1,20 +1,49 @@
-"""Streamlit 界面：AI 问答助手（多会话 · 流式 · 引用溯源）。
+"""Streamlit 界面：AI 问答助手（多会话 · 流式 · 引用溯源 · 意图路由）。
 
-用法：
+本地用法：
     uv run streamlit run app.py
+
+云端（Streamlit Community Cloud）：
+    直接以本文件为入口，requirements.txt 装依赖，Secrets 在面板里配。
 """
 
+import os
+import sys
 import time
+from pathlib import Path
 
 import streamlit as st
 
-from llm import get_llm
-from logging_setup import setup_logging
-from memory_v2 import ConversationStoreV2
-from retriever import retrieve
-from safe_qa import friendly_message
-from streaming import stream_answer
-from ingest import ingest
+# ==========================================================
+# 【必须在导入任何项目模块之前完成的两件事】
+#
+# ① sys.path：本地靠 .pth 把 src/ 加进路径，云端没有这个文件，
+#    所以 flat import（from llm import ...）会 ModuleNotFoundError。
+#
+# ② secrets 注入：Streamlit Cloud 的密钥在 st.secrets 里，不在 os.environ。
+#    而 config.py 在【导入时】就会读 os.environ["DEEPSEEK_API_KEY"]，
+#    所以必须在 from llm import ... 之前把值搬进环境变量。
+# ==========================================================
+ROOT = Path(__file__).resolve().parent
+for _p in (str(ROOT), str(ROOT / "src")):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+try:
+    for _key in st.secrets:
+        os.environ.setdefault(_key, str(st.secrets[_key]))
+except Exception:
+    # 本地没有 .streamlit/secrets.toml 时正常跳过（用 .env 就行）
+    pass
+
+# ---- 以下导入依赖上面的 sys.path 和环境变量 ----
+from llm import get_llm                          # noqa: E402
+from logging_setup import setup_logging          # noqa: E402
+from memory_v2 import ConversationStoreV2        # noqa: E402
+from retriever import DB_PATH, retrieve          # noqa: E402
+from safe_qa import friendly_message             # noqa: E402
+from streaming import stream_answer              # noqa: E402
+from ingest import ingest                        # noqa: E402
 
 # set_page_config：设置浏览器标签页的标题为“AI 问答助手”，图标为 💬，页面宽屏布局
 st.set_page_config(page_title="AI 问答助手", page_icon="💬", layout="wide")
@@ -65,6 +94,23 @@ def init_store() -> ConversationStoreV2:
     （cache_data 适合纯数据结果，比如一张表。）
     """
     setup_logging()
+
+    # 索引不存在时给明确提示（云端首次部署最常见的问题）
+    index_file = Path(DB_PATH) / "chroma.sqlite3"
+    if not index_file.exists():
+        st.warning(
+            "未找到向量索引，正在尝试重建（首次启动会慢）…"
+        )
+        try:
+            import reindex
+
+            if hasattr(reindex, "main"):
+                reindex.main()
+            else:
+                st.error("reindex 模块没有 main()，请手动执行 python src/reindex.py")
+        except Exception as exc:                     # noqa: BLE001
+            st.error(f"索引构建失败：{type(exc).__name__}: {exc}")
+
     store = ConversationStoreV2(mode="priority", llm=get_llm())
     try:
         retrieve("预热", k=1)
@@ -72,9 +118,8 @@ def init_store() -> ConversationStoreV2:
         pass
     return store
 
-
-store = init_store()
 # 调用上面的函数。因为加了缓存，这行代码在程序第一次运行时创建 store，后续刷新网页只是直接拿现成的
+store = init_store()
 
 
 # ---------- 初始化状态 ----------
@@ -86,7 +131,6 @@ if "histories" not in st.session_state:
 # 初始化当前会话 ID（带时间戳生成唯一 ID）
 if "current_sid" not in st.session_state:
     sid = f"s{int(time.time())}"
-
     st.session_state.histories[sid] = []
     st.session_state.current_sid = sid
     # 把刚刚生成的sid放入缓存中
@@ -170,7 +214,6 @@ with st.sidebar:
     # 业务含义	业务内容（聊天记录）。存的是用户和 AI 具体的对话文字。	聚合指标（统计数据）。存的是数字，用于性能监控。
     # 作用域范围	单会话级。每个 session_id 拥有自己独立的一组聊天记录。	全局级。不管你开多少个会话，所有的 Token 和耗时都在累加。
 
-    # 使用 columns 将统计指标横向排布，节省空间
     st.metric("Tokens", stats["tokens"] or "—")
     avg = stats["elapsed_ms"] / stats["turns"] if stats["turns"] else 0.0
     st.metric("平均耗时", f"{avg:.0f} ms")
@@ -183,7 +226,7 @@ current = st.session_state.current_sid
 history = st.session_state.histories[current]
 
 st.title("💬 AI 问答助手")
-st.caption("本地知识库 · 流式输出 · 引用溯源 · 多会话")
+st.caption("本地知识库 · 流式输出 · 引用溯源 · 多会话 · 意图路由")
 # st.title 和 st.caption：渲染大字标题和小字说明
 
 for message in history:
@@ -212,7 +255,7 @@ if prompt := st.chat_input("问我任何关于知识库的问题"):
             answer = st.write_stream(
                 # 来源在检索阶段就确定了，但 st.write_stream 会独占那个渲染区， 只能等它结束再渲染别的
                 stream_answer(prompt, current, store, collector)
-                # 把用户的问题、会话 ID、记忆库传给 stream_answer。这里真正触发了：改写 -> 检索 -> 生成 -> 记录日志 -> 容错处理
+                # 把用户的问题、会话 ID、记忆库传给 stream_answer。这里真正触发了：路由->改写->检索->证据校验->生成->记录日志->容错处理
             )
         except Exception as exc:
             st.error(friendly_message(exc))
@@ -232,10 +275,11 @@ if prompt := st.chat_input("问我任何关于知识库的问题"):
 
         # 整合并美化耗时指标（使用小字和代码块样式，让视觉更集中）
         backend_ms = collector.get("retrieve_ms", 0) + collector.get("total_ms", 0)
+        route = (collector.get("route") or {}).get("intent", "—")
         st.caption(
             f"⏱️ **后端** {backend_ms:.0f} ms（检索 {collector.get('retrieve_ms', 0):.0f} + "
             f"生成 {collector.get('total_ms', 0):.0f}）· **前端总** {wall_ms:.0f} ms · "
-            f"框架开销 {wall_ms - backend_ms:.0f} ms"
+            f"路由 `{route}` · 框架开销 {wall_ms - backend_ms:.0f} ms"
         )
 
     history.append({"role": "assistant", "content": answer or ""})

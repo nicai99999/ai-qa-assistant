@@ -22,7 +22,7 @@ from src.retriever import DB_PATH
 
 logger = logging.getLogger(__name__)
 
-DATA_DIR = Path(r"D:\ai-qa-assistant\data")
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
 NEW_COLLECTION = "rag_notes_v2"
 CHUNK_SIZE = 400
