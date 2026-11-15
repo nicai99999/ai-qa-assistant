@@ -1,0 +1,23 @@
+[
+  {"question": "RAG 的完整链路是什么", "intent": "knowledge"},
+  {"question": "SSE 和 WebSocket 的区别", "intent": "knowledge"},
+  {"question": "向量检索是怎么实现的", "intent": "knowledge"},
+  {"question": "代码里接口地址配错会报什么错", "intent": "knowledge"},
+  {"question": "上下文太长有什么后果", "intent": "knowledge"},
+
+  {"question": "我叫什么名字", "intent": "personal"},
+  {"question": "我是做什么的", "intent": "personal"},
+  {"question": "我的技术方向是什么", "intent": "personal"},
+  {"question": "我喜欢什么编程语言", "intent": "personal"},
+  {"question": "记住我下周要投简历", "intent": "personal"},
+
+  {"question": "你好", "intent": "chitchat"},
+  {"question": "谢谢", "intent": "chitchat"},
+  {"question": "早上好", "intent": "chitchat"},
+  {"question": "再见", "intent": "chitchat"},
+  {"question": "在吗", "intent": "chitchat"},
+
+  {"question": "本人叫魏文超，做 AI 应用开发", "intent": "personal", "hard": true},
+  {"question": "唠会儿天", "intent": "chitchat", "hard": true},
+  {"question": "嗯嗯", "intent": "chitchat", "hard": true}
+]
