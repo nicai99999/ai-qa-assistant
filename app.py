@@ -14,6 +14,13 @@ from pathlib import Path
 
 import streamlit as st
 
+# 容器 locale 可能是 POSIX，标准输出会用 ASCII 编码，
+# 打印中文就抛 UnicodeEncodeError。这里强制切成 UTF-8。
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 # ==========================================================
 # 【必须在导入任何项目模块之前完成的两件事】
 #
