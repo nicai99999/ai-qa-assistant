@@ -1,18 +1,43 @@
-"""Streamlit 界面：AI 问答助手（多会话 · 流式 · 引用溯源 · 意图路由）。
-
-本地用法：
-    uv run streamlit run app.py
-
-云端（Streamlit Community Cloud）：
-    直接以本文件为入口，requirements.txt 装依赖，Secrets 在面板里配。
-"""
-
 import os
 import sys
 import time
+import traceback
 from pathlib import Path
 
 import streamlit as st
+
+st.set_page_config(page_title="AI 问答助手", page_icon="💬", layout="wide")
+
+# ---- sys.path ----
+ROOT = Path(__file__).resolve().parent
+for _p in (str(ROOT), str(ROOT / "src")):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+# ---- secrets 注入 ----
+try:
+    for _k in st.secrets:
+        os.environ.setdefault(_k, str(st.secrets[_k]))
+except Exception:
+    pass
+
+# ---- 包住所有项目导入，失败时把完整堆栈显示出来 ----
+IMPORT_ERROR = ""
+try:
+    from llm import get_llm
+    from logging_setup import setup_logging
+    from memory_v2 import ConversationStoreV2
+    from retriever import DB_PATH, retrieve
+    from safe_qa import friendly_message
+    from streaming import stream_answer
+    from ingest import ingest
+except BaseException:
+    IMPORT_ERROR = traceback.format_exc()
+
+if IMPORT_ERROR:
+    st.error("模块导入失败 —— 下面是完整堆栈")
+    st.code(IMPORT_ERROR, language="text")
+    st.stop()
 
 # 容器 locale 可能是 POSIX，标准输出会用 ASCII 编码，
 # 打印中文就抛 UnicodeEncodeError。这里强制切成 UTF-8。
