@@ -259,6 +259,7 @@ if prompt := st.chat_input("问我任何关于知识库的问题"):
             )
         except Exception as exc:
             st.error(friendly_message(exc))
+            st.caption(f"[DEBUG] {type(exc).__name__}: {str(exc)[:400]}")
             answer = ""
 
         wall_ms = (time.perf_counter() - started) * 1000
