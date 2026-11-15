@@ -265,8 +265,11 @@ if prompt := st.chat_input("问我任何关于知识库的问题"):
                 # 把用户的问题、会话 ID、记忆库传给 stream_answer。这里真正触发了：路由->改写->检索->证据校验->生成->记录日志->容错处理
             )
         except Exception as exc:
+            import traceback
+
             st.error(friendly_message(exc))
-            st.caption(f"[DEBUG] {type(exc).__name__}: {str(exc)[:400]}")
+            st.caption(f"[DEBUG] {type(exc).__name__}: {str(exc)[:200]}")
+            st.code(traceback.format_exc()[-2000:], language="text")
             answer = ""
 
         wall_ms = (time.perf_counter() - started) * 1000
