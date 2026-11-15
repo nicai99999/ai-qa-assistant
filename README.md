@@ -141,6 +141,11 @@ Python 3.12 · LangChain · Chroma · DeepSeek API · uv
 
 ## 快速开始
 > 仓库内的 PDF 未上传（体积原因），可自行把文档放进 `data/` 后执行上面的建索引命令。
+> ## 在线体验
+
+https://ai-app-assistant-ctgmep4vbhvdahxthkjsnd.streamlit.app/
+
+> Streamlit 免费实例会休眠，首次访问需等约 30 秒冷启动。
 
 ```bash
 git clone https://github.com/nicai99999/ai-qa-assistant.git
